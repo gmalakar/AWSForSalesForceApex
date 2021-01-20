@@ -1,21 +1,22 @@
-public with sharing class AWSServiceClient {
+public with sharing virtual class AWSServiceClient {
     
-    private AWSClientConfig config = null;
+    protected AWSClientConfig Config = null;
+    protected Url RequestUrl;
+    protected Boolean IsQueryString = false;
+    protected Integer Expiresin = 30;
+        
     private final String ALGORITHM = 'AWS4-HMAC-SHA256';
     private string signedHeader = '';
-    private Datetime dateTime = Datetime.now();
-    private String contentType = 'application/x-www-form-urlencoded';
+    private Datetime dtime = Datetime.now();
+    private String lcontentType = 'application/x-www-form-urlencoded';
 	private String d;
 	private String timestamp;
 	private String scope;
     private String canonicalRequest;
-    private string signedHeader = '';
     private String canonicalHeaders;
     private String canonicalQueryString;
-    private Url requestUrl;
-    private Boolean isQueryString = false;
-    private Integer expiresin = 30;
-    
+    private String signedString;
+    private AWSRequestService.Protocol protocol = AWSRequestService.Protocol.Https; 
     /**
 	* Constructor
 	* Parameters: 
@@ -24,7 +25,7 @@ public with sharing class AWSServiceClient {
     *   token => token
     */
     public AWSServiceClient( AWSClientConfig clientConfig  ) {
-        this.config = config;
+        this.Config = clientConfig;
     }
 
     /**
@@ -34,7 +35,7 @@ public with sharing class AWSServiceClient {
 	*   secretKey => secret key
     */
     public AWSServiceClient( String accessKey, String secretKey ) {
-        config = new AWSClientConfig( accessKey, secretKey );
+        Config = new AWSClientConfig( accessKey, secretKey );
     }
 
     /**
@@ -45,7 +46,7 @@ public with sharing class AWSServiceClient {
     *   token => token
     */
     public AWSServiceClient( String accessKey, String secretKey, String token ) {
-        config = new AWSClientConfig( accessKey, secretKey, token );
+        Config = new AWSClientConfig( accessKey, secretKey, token );
     }
     
 
@@ -58,8 +59,8 @@ public with sharing class AWSServiceClient {
     *   region => region 
     */
     public AWSServiceClient( String accessKey, String secretKey, String token, string region ) {
-        config = new AWSClientConfig( accessKey, secretKey, token );
-        config.Region = region;
+        Config = new AWSClientConfig( accessKey, secretKey, token );
+        Config.Region = region;
     }
 
     /**
@@ -72,9 +73,9 @@ public with sharing class AWSServiceClient {
     *   service => service
     */
     public AWSServiceClient( String accessKey, String secretKey, String token, string region, string service ) {
-        config = new AWSClientConfig( accessKey, secretKey, token );
-        config.Region = region;
-        config.Service = service;
+        Config = new AWSClientConfig( accessKey, secretKey, token );
+        Config.Region = region;
+        Config.Service = service;
     }
 
 
@@ -96,8 +97,8 @@ public with sharing class AWSServiceClient {
     */
     public String Service 
     { 
-        get { return config.Service; }
-        set { config.Service = value; } 
+        get { return Config.Service; }
+        set { Config.Service = value; } 
     }
 
     /**
@@ -106,8 +107,8 @@ public with sharing class AWSServiceClient {
     */
     public String ContentType 
     { 
-        get { return this.contentType; }
-        set { this.contentType = value; } 
+        get { return this.lcontentType; }
+        set { this.lcontentType = value; } 
     }
 
     /**
@@ -124,17 +125,17 @@ public with sharing class AWSServiceClient {
 
     public String QueryString { get; set; }
 
-    private Blob Content { get; set; }
+    protected Blob Content { get; set; }
 
-    Map<String, String> headers  = new Map<String, String>();
+    protected Map<String, String> Headers  = new Map<String, String>();
 
-    Map<String, String> metadata  = new Map<String, String>();
+    protected Map<String, String> Metadata  = new Map<String, String>();
 
-    Map<String, String> parameters  = new Map<String, String>();
+    protected Map<String, String> Parameters  = new Map<String, String>();
     
-    private void initialize()
+    protected void initialize()
     {
-        this.dateTime = Datetime.now();
+        this.dtime = Datetime.now();
         this.d = this.getDate();
         this.timestamp = this.getTimestamp();
         this.scope = this.getScope();
@@ -145,27 +146,45 @@ public with sharing class AWSServiceClient {
         this.signedString = this.getSignature();
     }
     
+    protected String getSignedQueryString(){
+        this.initialize();
+        return this.RequestUrl.toExternalForm() + '?' + canonicalQueryString + '&X-Amz-Signature=' + this.signedString;
+    }
+    
+	private String getStringToSignDebug() {
+		String stringToSign = this.ALGORITHM + '\n' + 
+				this.timestamp + '\n' + 
+				this.scope + '\n' + 
+				this.canonicalRequest;
+		return stringToSign;
+    }
+    
+    protected String getStringTosignToCheck(){
+        this.initialize();
+        return getStringToSignDebug();
+    }
     private void setHeaders()
     {
-        this.setHeader('Host', this.host);
+        this.setHeader('Host', this.ApiHost);
+        //this.setHeader('Host', 's3.us-east-1.amazonaws.com');
         this.setHeader('X-Amz-Date', this.timestamp);
-        if ( String.isNotBlank(this.config.Token))
-            this.setHeader('X-Amz-Security-Token', this.config.Token);        
-        if ( String.isNotBlank(this.contentType))
-            this.setHeader('Content-Type', this.contentType);        
+        if ( String.isNotBlank(this.Config.Token))
+            this.setHeader('X-Amz-Security-Token', this.Config.Token);        
+        if ( String.isNotBlank(this.lcontentType))
+            this.setHeader('Content-Type', this.lcontentType);
     }
     
     public void setHeader( String key, String value)   
     {
-        this.headers.put(key, value);
+        this.Headers.put(key, value);
     }
 
-	/**
+    /**
 	* Generate the authorization header for the list bucket operation.
 	*/
 	private String getAuthHeader() {
 		String authHeader = this.ALGORITHM + ' ';
-		authHeader += 'Credential=' + this.config.AccessKey + '/' + this.scope + ', ';
+		authHeader += 'Credential=' + this.Config.AccessKey + '/' + this.scope + ', ';
 		authHeader += 'SignedHeaders=' + this.signedHeader;
 		authHeader += 'Signature=' + this.signedString;
 		return authHeader;
@@ -175,7 +194,7 @@ public with sharing class AWSServiceClient {
 	* Construct the AWS scope parameter.
 	*/
 	private String getScope() {
-		return this.d + '/' + this.config.Region + '/' + this.Service + '/aws4_request';
+		return this.d + '/' + this.Config.Region + '/' + this.Service + '/aws4_request';
 	}
 
 
@@ -191,7 +210,7 @@ public with sharing class AWSServiceClient {
 
     private String getHttpRequestMethod()
     {
-        return this.HttpMethod;
+        return this.HttpMethod.name();
     }
 
     private String getCanonicalURI()
@@ -205,8 +224,8 @@ public with sharing class AWSServiceClient {
             canonicalUri = String.join(encodedPath, '/');
         }
         
-        //headers
-
+        if ( canonicalUri.length() > 1 )
+            canonicalUri = AWSRequestService.TrimSlashesFromBegining( canonicalUri );
         return canonicalUri;
     }
     private void setCanonicalQueryString()
@@ -215,25 +234,42 @@ public with sharing class AWSServiceClient {
         if ( String.isNotBlank( this.QueryString ) ){
             System.PageReference ref = new System.PageReference( this.QueryString );
             Map<String, String> params = ref.getParameters();
-            if( params != null && params.size() > 0 ){
-                List<String> sortedHeader = sortedKeys( params );
-                List<String> paramList = new List<String>();
-                for ( String k : sortedHeader ){
-                    String val = this.headers.get(k).escapeHtml4();
-                    paramList.add(k+'='+val);
+            Map<String, String> paramsLowerKry = AWSRequestService.convertMapKeysTolower( this.Parameters );
+            
+            if ( paramsLowerKry.size() > 0 && params != null && params.size() > 0 ){
+                for (String key : params.keySet()){
+                    if( !paramsLowerKry.containsKey(key.toLowerCase()) )
+                        this.Parameters.put(key, params.get(key));
                 }
-                canonicalQueryString = String.join(paramList, '&');
             }
+            else if (  params != null && params.size() > 0 ){
+                this.Parameters = params;
+            }
+
         }
-        if( this.isQueryString ){
-            canonicalQueryString += '&X-Amz-Algorithm=' + ALGORITHM;
-            canonicalQueryString += '&X-Amz-Credential=' + this.config.AccessKey + '/' + this.scope;
-            canonicalQueryString += '&X-Amz-Date=' + this.timestamp;
-            canonicalQueryString += '&X-Amz-Expires=' + String.valueOf( this.expiresin);
-            canonicalQueryString += '&X-Amz-SignedHeaders=' + this.signedHeader;   
+            
+        if( this.Parameters != null && this.Parameters.size() > 0 ){
+            List<String> sortedParam = sortedKeys( this.Parameters );
+            List<String> paramList = new List<String>();
+            for ( String k : sortedParam ){
+                String val = this.Parameters.get(k).escapeHtml4();
+                paramList.add(k.escapeHtml4()+'='+val);
+            }
+            canonicalQueryString = String.join(paramList, '&');
+        }
+        
+        if( this.IsQueryString ){
+            canonicalQueryString += '&' + encodedQueryString('X-Amz-Algorithm', ALGORITHM);
+            canonicalQueryString += '&' + encodedQueryString('X-Amz-Credential', this.Config.AccessKey + '/' + this.scope);
+            canonicalQueryString += '&' + encodedQueryString('X-Amz-Date', this.timestamp);
+            canonicalQueryString += '&' + encodedQueryString('X-Amz-Expires', String.valueOf( this.Expiresin));
+            canonicalQueryString += '&' + encodedQueryString('X-Amz-SignedHeaders', this.signedHeader);   
         }
     }
     
+    private String encodedQueryString( String key, String val ){
+        return key.escapeHtml4() + '=' + val.escapeHtml4();
+    }
     private String getCanonicalQueryString()
     {
         return canonicalQueryString;
@@ -249,19 +285,21 @@ public with sharing class AWSServiceClient {
     private void setCanonicalHeaders()
     {
         canonicalHeaders = '';
-        List<String> sortedHeader = sortedKeys( this.headers );
+        List<String> sortedHeader = sortedKeys( this.Headers );
         for ( String k : sortedHeader ){
             String hdr = k.toLowerCase();
-            String val = this.headers.get(k).trim();
-
-            canonicalHeaders += hdr+':'+val+'\n';
+            String val = this.Headers.get(k).trim();
             
-            if ( signedHeader.length() > 0 )
-                signedHeader += ';';
+            Boolean addHeader = !( this.IsQueryString && hdr.startsWith('x-amz-') );
+            if( addHeader ){
+                canonicalHeaders += hdr+':'+val+'\n';
+                
+                if ( signedHeader.length() > 0 )
+                    signedHeader += ';';
 
-            signedHeader += hdr;            
+                signedHeader += hdr;
+            }        
         }
-        canonicalHeaders;
     }
     
     private String getCanonicalHeaders()
@@ -276,15 +314,15 @@ public with sharing class AWSServiceClient {
 
     private String getPayload()
     {
-        if( this.Content = null ){
+        if( this.Content == null ){
             this.Content = Blob.valueOf('');
         }
-        return EncodingUtil.convertToHex(Crypto.generateDigest('SHA-256', Blob.valueOf(this.Content))).toLowerCase();
+        return EncodingUtil.convertToHex(Crypto.generateDigest('SHA-256', this.Content)).toLowerCase();
     }
 
     private String getUrlEncodedString( String path ){
         //Each path segment must be URI-encoded twice (except for Amazon S3 which only gets URI-encoded once)
-        if ( this.Service.toLowerCase() = 's3' ){
+        if ( this.Service.toLowerCase() == 's3' ){
             return EncodingUtil.urlEncode(path,'UTF-8');
         }
         else {
@@ -311,21 +349,21 @@ public with sharing class AWSServiceClient {
 	* Returns the current date in string format (YYYYMMDD)
 	*/
 	private String getDate() {
-		return String.valueOf(this.dateTime.yearGmt()) + 
-				this.getString(this.dateTime.monthGmt()) + 
-				this.getString(this.dateTime.dayGmt());
+		return String.valueOf(this.dtime.yearGmt()) + 
+				this.getString(this.dtime.monthGmt()) + 
+				this.getString(this.dtime.dayGmt());
 	}
 
 	/**
 	* Returns the current timestamp in ISO format (YYYYMMDDTHHMMSSZ)
 	*/
 	private String getTimestamp() {
-		return this.getString(this.dateTime.yearGmt()) + 
-				this.getString(this.dateTime.monthGmt()) + 
-				this.getString(this.dateTime.dayGmt()) + 'T' + 
-				this.getString(this.dateTime.hourGmt()) + 
-				this.getString(this.dateTime.minuteGmt()) + 
-				this.getString(this.dateTime.secondGmt()) + 
+		return this.getString(this.dtime.yearGmt()) + 
+				this.getString(this.dtime.monthGmt()) + 
+				this.getString(this.dtime.dayGmt()) + 'T' + 
+				this.getString(this.dtime.hourGmt()) + 
+				this.getString(this.dtime.minuteGmt()) + 
+				this.getString(this.dtime.secondGmt()) + 
 				'Z';
 	}
 
@@ -351,14 +389,14 @@ public with sharing class AWSServiceClient {
 	* Generate the AWS signing key.
 	*/
 	private Blob getSigningKey() {
-		Blob kDate = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.d), Blob.valueOf('AWS4' +this.config.SecretKey));
-		Blob kRegion = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.config.Region), kDate);
+		Blob kDate = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.d), Blob.valueOf('AWS4' +this.Config.SecretKey));
+		Blob kRegion = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.Config.Region), kDate);
 		Blob kService = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.Service), kRegion);
 		Blob kSigning = Crypto.generateMac('hmacSHA256', Blob.valueOf('aws4_request'), kService);
 		return kSigning;
     }
 
-    
+        
     /**
 	* To invoke aws lambda.
 	* Parameters: 
@@ -370,10 +408,10 @@ public with sharing class AWSServiceClient {
 	public HttpResponse sendLambdaRequest(String functionName, AWSRequestService.HttpMethod method , String content, String stage) {
         this.Service = 'lambda';
         this.ResourcePath = '/' + stage + '/' + functionName;
-        this.requestUrl = new Url(AWSRequestService.GetApiEndpoint(functionName, this.Service, this.config.Region, stage));
+        this.RequestUrl = new Url(AWSRequestService.GetApiEndpoint(functionName, this.Service, this.Config.Region, stage));
         this.HttpMethod = method;
         this.Content = Blob.valueOf(content);
-        this.ApiHost = this.requestUrl.getHost();
+        this.ApiHost = this.RequestUrl.getHost();
         this.initialize();
 		HttpRequest req = this.getRequest();
 		Http http = new Http();
@@ -390,11 +428,11 @@ public with sharing class AWSServiceClient {
 	*/
 	public HttpResponse sendApiRequest(String baseUrl, String functionName, AWSRequestService.HttpMethod method , String content, String environment) {
 		this.ResourcePath = '/' + environment + '/' + functionName;
-        this.requestUrl = new Url(baseUrl, + this.ResourcePath );
+        this.RequestUrl = new Url(baseUrl + this.ResourcePath );
         this.HttpMethod = method;
         this.Service = 'execute-api';
         this.Content = Blob.valueOf(content);
-        this.ApiHost = this.requestUrl.getHost();
+        this.ApiHost = this.RequestUrl.getHost();
         this.initialize();
 		HttpRequest req = this.getRequest();
 		Http http = new Http();
@@ -406,13 +444,13 @@ public with sharing class AWSServiceClient {
 	*/
 	private HttpRequest getRequest() {
 		HttpRequest req = new HttpRequest();
-		req.setEndpoint(this.requestUrl.toExternalForm());
-		req.setMethod(this.HttpMethod);
-        for(String key : this.headers.keySet()){
-            req.setHeader(key, this.headers.get(key));
+		req.setEndpoint(this.RequestUrl.toExternalForm());
+		req.setMethod(this.HttpMethod.name());
+        for(String key : this.Headers.keySet()){
+            req.setHeader(key, this.Headers.get(key));
         }
 		req.setHeader('Authorization', this.getAuthHeader());
-		req.setBody(this.content);
+		req.setBodyAsBlob(content);
 
 		return req;
 	}

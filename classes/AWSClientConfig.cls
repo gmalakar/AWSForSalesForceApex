@@ -1,6 +1,6 @@
-public with sharing class AWSClientConfig {
+public class AWSClientConfig {
 
-    private String DEFAULT_TOKEN = null;
+    private static String DEFAULT_TOKEN = null;
     
     private String DEFAULT_REGION = 'us-east-1';
     
@@ -28,6 +28,7 @@ public with sharing class AWSClientConfig {
         this.AccessKey = accessKey;
         this.SecretKey = secretKey;
         this.Token = token;
+        this.Region = DEFAULT_REGION;
     }
 
 }
