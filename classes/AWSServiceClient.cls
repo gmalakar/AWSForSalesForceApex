@@ -4,12 +4,16 @@ public with sharing virtual class AWSServiceClient {
     protected Url RequestUrl;
     protected Boolean IsQueryString = false;
     protected Integer Expiresin = 30;
-        
+    
+    private static String gmtFormat = 'yyyyMMdd\'T\'HHmmss\'Z\'';
+    
     private final String ALGORITHM = 'AWS4-HMAC-SHA256';
+    private final String unsignedPayload = 'UNSIGNED-PAYLOAD';
+
     private string signedHeader = '';
     private Datetime dtime = Datetime.now();
     private String lcontentType = 'application/x-www-form-urlencoded';
-	private String d;
+	private String onlydate;
 	private String timestamp;
 	private String scope;
     private String canonicalRequest;
@@ -136,7 +140,7 @@ public with sharing virtual class AWSServiceClient {
     protected void initialize()
     {
         this.dtime = Datetime.now();
-        this.d = this.getDate();
+        this.onlydate = this.getDate();
         this.timestamp = this.getTimestamp();
         this.scope = this.getScope();
         this.setHeaders();
@@ -153,7 +157,7 @@ public with sharing virtual class AWSServiceClient {
     
 	private String getStringToSignDebug() {
 		String stringToSign = this.ALGORITHM + '\n' + 
-				this.timestamp + '\n' + 
+				this.getTimestamp() + '\n' + 
 				this.scope + '\n' + 
 				this.canonicalRequest;
 		return stringToSign;
@@ -167,7 +171,7 @@ public with sharing virtual class AWSServiceClient {
     {
         this.setHeader('Host', this.ApiHost);
         //this.setHeader('Host', 's3.us-east-1.amazonaws.com');
-        this.setHeader('X-Amz-Date', this.timestamp);
+        this.setHeader('X-Amz-Date', this.getTimestamp());
         if ( String.isNotBlank(this.Config.Token))
             this.setHeader('X-Amz-Security-Token', this.Config.Token);        
         if ( String.isNotBlank(this.lcontentType))
@@ -194,7 +198,7 @@ public with sharing virtual class AWSServiceClient {
 	* Construct the AWS scope parameter.
 	*/
 	private String getScope() {
-		return this.d + '/' + this.Config.Region + '/' + this.Service + '/aws4_request';
+		return this.getDate() + '/' + this.Config.Region + '/' + this.Service + '/aws4_request';
 	}
 
 
@@ -252,8 +256,8 @@ public with sharing virtual class AWSServiceClient {
             List<String> sortedParam = sortedKeys( this.Parameters );
             List<String> paramList = new List<String>();
             for ( String k : sortedParam ){
-                String val = this.Parameters.get(k).escapeHtml4();
-                paramList.add(k.escapeHtml4()+'='+val);
+                String val = AWSRequestService.UriEncode( this.Parameters.get(k) );
+                paramList.add(AWSRequestService.UriEncode( k )+'='+val);
             }
             canonicalQueryString = String.join(paramList, '&');
         }
@@ -261,14 +265,14 @@ public with sharing virtual class AWSServiceClient {
         if( this.IsQueryString ){
             canonicalQueryString += '&' + encodedQueryString('X-Amz-Algorithm', ALGORITHM);
             canonicalQueryString += '&' + encodedQueryString('X-Amz-Credential', this.Config.AccessKey + '/' + this.scope);
-            canonicalQueryString += '&' + encodedQueryString('X-Amz-Date', this.timestamp);
+            canonicalQueryString += '&' + encodedQueryString('X-Amz-Date', this.getTimestamp());
             canonicalQueryString += '&' + encodedQueryString('X-Amz-Expires', String.valueOf( this.Expiresin));
             canonicalQueryString += '&' + encodedQueryString('X-Amz-SignedHeaders', this.signedHeader);   
         }
     }
     
     private String encodedQueryString( String key, String val ){
-        return key.escapeHtml4() + '=' + val.escapeHtml4();
+        return AWSRequestService.UriEncode( key ) + '=' + AWSRequestService.UriEncode(  val );
     }
     private String getCanonicalQueryString()
     {
@@ -317,6 +321,7 @@ public with sharing virtual class AWSServiceClient {
         if( this.Content == null ){
             this.Content = Blob.valueOf('');
         }
+        this.Content = Blob.valueOf(unsignedPayload);
         return EncodingUtil.convertToHex(Crypto.generateDigest('SHA-256', this.Content)).toLowerCase();
     }
 
@@ -349,22 +354,28 @@ public with sharing virtual class AWSServiceClient {
 	* Returns the current date in string format (YYYYMMDD)
 	*/
 	private String getDate() {
+        return this.dtime.formatGMT('YYYYMMDD');
+        /*
 		return String.valueOf(this.dtime.yearGmt()) + 
 				this.getString(this.dtime.monthGmt()) + 
-				this.getString(this.dtime.dayGmt());
+                this.getString(this.dtime.dayGmt());
+                */
 	}
 
 	/**
 	* Returns the current timestamp in ISO format (YYYYMMDDTHHMMSSZ)
 	*/
 	private String getTimestamp() {
+        return this.dtime.formatGMT(gmtFormat);
+        /*
 		return this.getString(this.dtime.yearGmt()) + 
 				this.getString(this.dtime.monthGmt()) + 
 				this.getString(this.dtime.dayGmt()) + 'T' + 
 				this.getString(this.dtime.hourGmt()) + 
 				this.getString(this.dtime.minuteGmt()) + 
 				this.getString(this.dtime.secondGmt()) + 
-				'Z';
+                'Z';
+                */
 	}
 
 	/**
@@ -389,14 +400,17 @@ public with sharing virtual class AWSServiceClient {
 	* Generate the AWS signing key.
 	*/
 	private Blob getSigningKey() {
-		Blob kDate = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.d), Blob.valueOf('AWS4' +this.Config.SecretKey));
+		Blob kDate = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.getDate()), Blob.valueOf('AWS4' +this.Config.SecretKey));
 		Blob kRegion = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.Config.Region), kDate);
 		Blob kService = Crypto.generateMac('hmacSHA256', Blob.valueOf(this.Service), kRegion);
 		Blob kSigning = Crypto.generateMac('hmacSHA256', Blob.valueOf('aws4_request'), kService);
 		return kSigning;
     }
 
-        
+ 	protected String getSigningKeyAslog() {
+        return String.format('date: {0}, Key: {1}, Region: {2}, Servive: {3}, Siginging: {4}, timestamp: {5} ', new List<Object> { this.getDate() , this.Config.SecretKey, this.Config.Region, this.Service, 'aws4_request', this.getTimestamp()});
+    }
+
     /**
 	* To invoke aws lambda.
 	* Parameters: 

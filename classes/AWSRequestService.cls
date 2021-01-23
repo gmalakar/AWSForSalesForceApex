@@ -109,7 +109,11 @@ public with sharing class AWSRequestService {
         }
         return arg;
     }
-    
+
+    public static string UriEncode( String arg ){
+        return EncodingUtil.urlEncode(arg,'UTF-8');
+    }
+
     public class GetS3PreSignedRequest extends AWSPreSignedRequest
     {
         public GetS3PreSignedRequest()
