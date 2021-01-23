@@ -4,8 +4,8 @@
 I have just started this and looking for helping hands.
 
 Example of invoke api:
-public class AWSExamples {
 
+public class AWSExamples {
     public static HttpResponse invokeApi(){
         AWSConfig.APIGateway apiConfig = new AWSConfig.APIGateway('<your access key>', '<your secret key>' );
         AWSServiceClient.APIGateway apiClient = new AWSServiceClient.APIGateway( apiConfig );
