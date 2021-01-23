@@ -1,4 +1,11 @@
-public class AWSConfig {
+// ===============================
+// AUTHOR           : Goutam malakar
+// CREATE DATE      : 01/23/2021
+// PURPOSE          : AWS Configurations
+// SPECIAL NOTES    :
+// ===============================
+
+public abstract class AWSConfig {
 
     static final String DEFAULT_TOKEN = null;
     

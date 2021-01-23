@@ -1,3 +1,10 @@
+// ===============================
+// AUTHOR           : Goutam malakar
+// CREATE DATE      : 01/23/2021
+// PURPOSE          : Different collections
+// SPECIAL NOTES    :
+// ===============================
+
 public abstract class AWSCollection {
 
     public virtual class MapIngnoreCase {

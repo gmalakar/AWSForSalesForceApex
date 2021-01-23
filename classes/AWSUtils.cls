@@ -1,3 +1,10 @@
+// ===============================
+// AUTHOR           : Goutam malakar
+// CREATE DATE      : 01/23/2021
+// PURPOSE          : Different AWS Utils
+// SPECIAL NOTES    :
+// ===============================
+
 public abstract class AWSUtils {
 
     static final Set<String> slashes = new Set<String>{'/','\\'};
@@ -14,7 +21,7 @@ public abstract class AWSUtils {
     
     public static HttpMethods HttpMethod = new HttpMethods();
 
-    public static Blob BlobCopy( Blob data ) 
+    public static Blob blobCopy( Blob data ) 
     {
         return EncodingUtil.base64Decode(EncodingUtil.base64Encode(data));
     }
@@ -27,7 +34,7 @@ public abstract class AWSUtils {
       return newMap;
     }
     
-    public static String TrimSlashesFromBegining( String arg ){
+    public static String trimSlashesFromBegining( String arg ){
         if ( arg != null && arg.Length() > 0 && slashes.contains(arg.left(1))){
             if ( arg.length() > 1 ){
                 arg = arg.substring(1, arg.length() ); 
@@ -39,16 +46,16 @@ public abstract class AWSUtils {
         return arg;
     }
     
-    public static String UriEncode( String arg, Boolean path ){
+    public static String uriEncode( String arg, Boolean path ){
         return EncodingUtil.urlEncode(arg,'UTF-8');
     }
 
-    public static String GetLambdaEndpoint( String region )
+    public static String getLambdaEndpoint( String region )
     {
         return 'https://lambda.' + region + '.amazonaws.com';
     }
 
-    public static String GetServiceEndpoint( String id, String service, String region, String stagename )
+    public static String getServiceEndpoint( String id, String service, String region, String stagename )
     {
         String api = 'https://' + id + '.' + service + '.' + region + '.amazonaws.com/';
         if( String.isNotBlank(( stagename ))){
@@ -57,14 +64,14 @@ public abstract class AWSUtils {
         return api;
     }
 
-    public static String GetApiEndpoint( String id, String region, String stagename )
+    public static String getApiEndpoint( String id, String region, String stagename )
     {
-        return GetServiceEndpoint( id, 'execute-api', region,stagename);
+        return getServiceEndpoint( id, 'execute-api', region,stagename);
     }
 
-    public static String GetS3Endpoint( String bucketName, String region )
+    public static String getS3Endpoint( String bucketName, String region )
     {
-        return GetServiceEndpoint( bucketName, 's3', region, null );
+        return getServiceEndpoint( bucketName, 's3', region, null );
     }    
 
 }

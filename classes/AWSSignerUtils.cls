@@ -1,5 +1,11 @@
-public class AWSSignerUtils {
+// ===============================
+// AUTHOR           : Goutam malakar
+// CREATE DATE      : 01/23/2021
+// PURPOSE          : Static methods related to AWS4 signer
+// SPECIAL NOTES    :
+// ===============================
 
+public class AWSSignerUtils {
 
     static final String EmptyBodySha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
     public static final String AWSSchema = 'AWS4';
@@ -20,7 +26,7 @@ public class AWSSignerUtils {
         else{
             List<String> splits = path.split('/');
             for (Integer i = 0; i < splits.size(); i++) {
-                splits[i] = UriEncode(splits[i]);
+                splits[i] = uriEncode(splits[i]);
             }    
             path = String.join(splits, '/');
         }
@@ -32,29 +38,41 @@ public class AWSSignerUtils {
 	*/
 	public static Blob getSigningKey( Datetime signedAt, String secretKey, String region, String service ) {
         Blob kSecret = Blob.valueOf( AWSSchema + secretKey);
-		Blob kDate = ToHmacSha256(kSecret, getDate(signedAt));
-		Blob kRegion = ToHmacSha256(kDate, region);       
-        Blob kService = ToHmacSha256(kRegion, service);
-        Blob kSigning = ToHmacSha256(kService, Terminator);
+		Blob kDate = toHmacSha256(kSecret, getDate(signedAt));
+		Blob kRegion = toHmacSha256(kDate, region);       
+        Blob kService = toHmacSha256(kRegion, service);
+        Blob kSigning = toHmacSha256(kService, Terminator);
 		return kSigning;
     }
 
-    public static String getStringToSign( String alogorithmUsed, Datetime signedAt, String scope, String hashedCononicalrequest ) {
+    /**
+	* Generate string to sign.
+	*/
+	public static String getStringToSign( String alogorithmUsed, Datetime signedAt, String scope, String hashedCononicalrequest ) {
         return  alogorithmUsed + lineBreak + getTimestamp(signedAt) + lineBreak + scope + lineBreak + hashedCononicalrequest;
     }
 
-    public static String getSignature( String stringToSign, Blob signingKey ) {
-        return ToHexEncode(ToHmacSha256(signingKey, stringToSign));
+    /**
+	* get authorized signature.
+	*/
+	public static String getSignature( String stringToSign, Blob signingKey ) {
+        return toHexEncode(toHmacSha256(signingKey, stringToSign));
     }
     
-    public static String getScope( Datetime signedAt, String region, String service ) {
+    /**
+	* get scope of the service.
+	*/
+	public static String getScope( Datetime signedAt, String region, String service ) {
         if( String.isBlank(region) ){
             region = 'us-east-1';
         }
 		return getDate( signedAt ) + '/' + region + '/' + service + '/aws4_request';
 	}
 
-    public static String getHashedPayload( String payload )
+    /**
+	* get hashed payload.
+	*/
+	public static String getHashedPayload( String payload )
     {
         if( String.isBlank(payload) ){
             return EmptyBodySha256;
@@ -62,11 +80,17 @@ public class AWSSignerUtils {
         return getHashedString( payload, false );
     }
 
-    public static String getHashedString( String stringToHash, Boolean lowerCase ){
+    /**
+	* get hashed string.
+	*/
+	public static String getHashedString( String stringToHash, Boolean lowerCase ){
         return ToHexEncode(ToHash(stringToHash), lowercase);
     }
 
-    public static String getHashedBlob( Blob blobToHash, Boolean lowerCase ){
+    /**
+	* get hashed blob.
+	*/
+	public static String getHashedBlob( Blob blobToHash, Boolean lowerCase ){
         String hashedString = EncodingUtil.convertToHex(Crypto.generateDigest('SHA-256', blobToHash));
         if( lowerCase ){
             hashedString = hashedString.toLowerCase();
@@ -74,7 +98,10 @@ public class AWSSignerUtils {
         return hashedString;
     }
 
-    public static String getSortedQueryString( Url requestUrl ){
+    /**
+	* get sorted query string.
+	*/
+	public static String getSortedQueryString( Url requestUrl ){
         STring sortedQueryString = '';
         String query = requestUrl.getQuery();
         if ( String.isNotBlank( query ) ){
@@ -87,8 +114,8 @@ public class AWSSignerUtils {
                 }
                 List<String> paramList = new List<String>();
                 for (String k : sortedParams.sortedKeySet() ){
-                    String val = UriEncode( sortedParams.get(k) );
-                    paramList.add(UriEncode( k )+'='+val);      
+                    String val = uriEncode( sortedParams.get(k) );
+                    paramList.add(uriEncode( k )+'='+val);      
                 }
                 sortedQueryString = String.join(paramList, '&');
             }
@@ -96,7 +123,10 @@ public class AWSSignerUtils {
         return sortedQueryString;
     }
     
-    public static string UriEncode( String arg ){
+    /**
+	* encode url.
+	*/
+	public static string uriEncode( String arg ){
         return EncodingUtil.urlEncode(arg,'UTF-8');
     }
     /**
@@ -132,7 +162,7 @@ public class AWSSignerUtils {
 		return s;
 	}
 
-    public static String CompressSpaces(String data){
+    public static String compressSpaces(String data){
         if ( data == null ) {
             return null;           
         }
@@ -143,17 +173,17 @@ public class AWSSignerUtils {
         return data.normalizeSpace();
     }
     
-    public static Blob ToHash( Blob data) 
+    public static Blob toHash( Blob data) 
     {
         return Crypto.generateDigest(HashAlorithm, data);
     }
 
-    public static Blob ToHash( String data) 
+    public static Blob toHash( String data) 
     {
         return Crypto.generateDigest(HashAlorithm, Blob.valueOf(data));
     }
 
-    public static String ToHexEncode( Blob data, Boolean lowercase) 
+    public static String toHexEncode( Blob data, Boolean lowercase) 
     {
         String hex = EncodingUtil.convertToHex(data);
         if ( lowercase )
@@ -162,22 +192,22 @@ public class AWSSignerUtils {
         return hex.replace('-', '');
     }
 
-    public static String ToHexEncode( String data, Boolean lowercase) 
+    public static String toHexEncode( String data, Boolean lowercase) 
     {
-        return ToHexEncode( Blob.valueOf(data), lowercase );
+        return toHexEncode( Blob.valueOf(data), lowercase );
     }
 
-    public static String ToHexEncode( Blob data) 
+    public static String toHexEncode( Blob data) 
     {
-       return ToHexEncode( data, false );
+       return toHexEncode( data, false );
     }
 
-    public static String ToHexEncode( String data) 
+    public static String toHexEncode( String data) 
     {
-        return ToHexEncode( Blob.valueOf(data), false );
+        return toHexEncode( Blob.valueOf(data), false );
     }
     
-    public static Blob ToHmacSha256(  Blob key, String data )
+    public static Blob toHmacSha256(  Blob key, String data )
     {
         return Crypto.generateMac( MacAlorithm, Blob.valueOf(data), key);
     }
