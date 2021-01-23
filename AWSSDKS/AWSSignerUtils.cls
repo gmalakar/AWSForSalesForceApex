@@ -1,4 +1,16 @@
-public with sharing class AWSSignerUtils {
+public class AWSSignerUtils {
+
+
+    static final String EmptyBodySha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    public static final String AWSSchema = 'AWS4';
+    static final String Algorithm  = 'HMAC-SHA256';
+    public static final String AWS4AlgorithmTag  = AWSSchema + '-' + Algorithm;
+    static final String Terminator = 'aws4_request';
+    static final String MacAlorithm = 'hmacSHA256';   
+    static final String lineBreak ='\n';
+    static final String Slash = '/';
+    static final String HashAlorithm = 'SHA-256';   
+
     public static String getCanonicalpath( Url requestUrl ){    
         String path = requestUrl.getPath().toLowerCase();
 
@@ -62,15 +74,14 @@ public with sharing class AWSSignerUtils {
         return hashedString;
     }
 
-    public static String getSortedQueryString( Url requestUrl )
-    {
+    public static String getSortedQueryString( Url requestUrl ){
         STring sortedQueryString = '';
         String query = requestUrl.getQuery();
         if ( String.isNotBlank( query ) ){
             System.PageReference ref = new System.PageReference( query );
             Map<String, String> params = ref.getParameters();
             if ( params != null && params.size() > 0 ){
-                MapIngnoreCase sortedParams = new MapIngnoreCase();
+                AWSCollection.MapIngnoreCase sortedParams = new AWSCollection.MapIngnoreCase();
                 for (String key : params.keySet()){
                     sortedParams.Add(key, params.get(key));               
                 }
@@ -170,15 +181,5 @@ public with sharing class AWSSignerUtils {
     {
         return Crypto.generateMac( MacAlorithm, Blob.valueOf(data), key);
     }
-
-    static final String EmptyBodySha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-    static final String AWSSchema = 'AWS4';
-    static final String Algorithm  = 'HMAC-SHA256';
-    static final String AWS4AlgorithmTag  = AWSSchema + '-' + Algorithm;
-    static final String Terminator = 'aws4_request';
-    static final String MacAlorithm = 'hmacSHA256';   
-    static final String lineBreak ='\n';
-    static final String Slash = '/';
-    static final String HashAlorithm = 'SHA-256';   
     
 }
